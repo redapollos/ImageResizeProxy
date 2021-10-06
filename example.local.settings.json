@@ -1,0 +1,19 @@
+{
+  "ConnectionStrings": {
+    "AzureStorage": "your-connection-string-for-storage-account"
+  },
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "",
+    "FUNCTIONS_WORKER_RUNTIME": "dotnet",
+    "AzureContainer":  "your-container"
+  },
+  "ImageResizer": {
+    "SmallSize": "200x200",
+    "MediumSize": "400x400",
+    "HeroSize": "1440x620"
+  },
+  "ClientCache": {
+    "MaxAge": "30.00:00:00"
+  }
+}
