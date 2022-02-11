@@ -43,9 +43,6 @@ namespace RainstormTech.Storm.ImageProxy
                 return new StatusCodeResult((int)HttpStatusCode.NotModified);
             }
 
-            // set cache 
-            this.SetCacheHeaders(req.HttpContext.Response.GetTypedHeaders());
-
             try
             {
                 // get the url
@@ -88,6 +85,9 @@ namespace RainstormTech.Storm.ImageProxy
                     _ => "image/jpeg"
                 };
 
+                // set cache 
+                this.SetCacheHeaders(req.HttpContext.Response.GetTypedHeaders());
+                
                 // return the stream
                 return new FileStreamResult(imageStream, mimeType);
             }
