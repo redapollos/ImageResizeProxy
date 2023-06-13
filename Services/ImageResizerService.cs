@@ -39,9 +39,9 @@ namespace RainstormTech.Storm.ImageProxy
         /// <param name="output"></param>
         /// <param name="mode"></param>
         /// <returns></returns>
-        public async Task<Stream> ResizeAsync(string url, string size, string output, string mode)
+        public async Task<Stream> ResizeAsync(string url, string size, string output, string mode, bool cache = false)
         {
-            return await this.GetResultStreamAsync(url, StringToImageSize(size), output, mode);
+            return await this.GetResultStreamAsync(url, StringToImageSize(size), output, mode, cache);
         }
 
 
@@ -53,7 +53,7 @@ namespace RainstormTech.Storm.ImageProxy
         /// <param name="output"></param>
         /// <param name="mode"></param>
         /// <returns></returns>
-        private async Task<Stream> GetResultStreamAsync(string uri, ImageSize imageSize, string output, string mode)
+        private async Task<Stream> GetResultStreamAsync(string uri, ImageSize imageSize, string output, string mode, bool cache = false)
         {
             // Create a BlobServiceClient object which will be used to create a container client
             BlobServiceClient blobServiceClient = new BlobServiceClient(config.GetConnectionString("AzureStorage"));
@@ -61,7 +61,7 @@ namespace RainstormTech.Storm.ImageProxy
             // get the container name            
             string containerName = config.GetValue("AzureContainer", "storm");
 
-            try
+			try
             {
                 // Create the container and return a container client object
                 var container = blobServiceClient.GetBlobContainerClient(containerName);
@@ -70,14 +70,32 @@ namespace RainstormTech.Storm.ImageProxy
                 // Get a reference to a blob
                 BlobClient blobClient = container.GetBlobClient(uri);
 
+				// Get cache image
+				var cacheUri = $"Cache{uri}_{imageSize.Width}_{imageSize.Height}_{output}_{mode}";
+				if (cache)
+                {
+					var cacheBlobClient = container.GetBlobClient(cacheUri);
+					if (await cacheBlobClient.ExistsAsync())
+					{
+						return (await cacheBlobClient.DownloadStreamingAsync()).Value.Content;
+					}
+				}
+
                 // Download the blob's contents and save it to a strea
                 using (var imageStream = new MemoryStream())
                 {
                     await blobClient.DownloadToAsync(imageStream);
                     imageStream.Position = 0;
 
-                    return GetResizedImage(imageStream, imageSize, output, mode);
-                }
+					var newImage = GetResizedImage(imageStream, imageSize, output, mode);
+                    if (cache)
+                    {
+						// Upload cache image
+						await container.UploadBlobAsync(cacheUri, newImage);
+						newImage.Position = 0;
+					}
+					return newImage;
+				}
             }
             catch(Exception ex)
             {

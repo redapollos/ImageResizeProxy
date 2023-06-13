@@ -6,6 +6,6 @@ namespace RainstormTech.Storm.ImageProxy
 {
     public interface IImageResizerService
     {
-        Task<Stream> ResizeAsync(string url, string size, string output, string mode);
+        Task<Stream> ResizeAsync(string url, string size, string output, string mode, bool cache = false);
     }
 }
