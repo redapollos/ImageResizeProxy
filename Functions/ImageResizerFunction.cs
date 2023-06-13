@@ -31,73 +31,87 @@ namespace RainstormTech.Storm.ImageProxy
         }
 
 
-        /*
+		/*
          * Main entry point...takes a wildcard.
          */
-        [FunctionName("ResizeImage")]
-        public async Task<IActionResult> Run([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ResizeImage/{*restOfPath}")] HttpRequest req, string restOfPath)
+		[FunctionName("ResizeImage")]
+		public async Task<IActionResult> Run1([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ResizeImage/{*restOfPath}")] HttpRequest req, string restOfPath)
+		{
+			return await ResizeImage(req, restOfPath, false);
+		}
+
+		/*
+	     * Main entry point...takes a wildcard.
+	     */
+		[FunctionName("ResizeImageCache")]
+		public async Task<IActionResult> Run2([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "ResizeImageCache/{*restOfPath}")] HttpRequest req, string restOfPath)
+		{
+			return await ResizeImage(req, restOfPath, true);
+		}
+
+		private async Task<IActionResult> ResizeImage(HttpRequest req, string restOfPath, bool cache)
         {
-            // check to see if we have a cached version and just leave if we do
-            if (req.HttpContext.Request.GetTypedHeaders().IfModifiedSince.HasValue)
-            {
-                return new StatusCodeResult((int)HttpStatusCode.NotModified);
-            }
+			// check to see if we have a cached version and just leave if we do
+			if (req.HttpContext.Request.GetTypedHeaders().IfModifiedSince.HasValue)
+			{
+				return new StatusCodeResult((int)HttpStatusCode.NotModified);
+			}
 
-            try
-            {
-                // get the url
-                var url = restOfPath.Replace(config.GetValue<string>("AzureContainer"), "");
+			try
+			{
+				// get the url
+				var url = restOfPath.Replace(config.GetValue<string>("AzureContainer"), "");
 
-                // we need at least the url
-                if (string.IsNullOrEmpty(url))
-                    return new BadRequestObjectResult("URL is required");
+				// we need at least the url
+				if (string.IsNullOrEmpty(url))
+					return new BadRequestObjectResult("URL is required");
 
-                // figure out the needed variables
-                // var url = req.Query["url"].ToString();
-                var size = req.Query.ContainsKey("size") ? req.Query["size"].ToString() : "";
-                var width = req.Query.ContainsKey("w") ? req.Query["w"].ToString().ToInt() : 0;
-                var height = req.Query.ContainsKey("h") ? req.Query["h"].ToString().ToInt() : 0;
-                var output = req.Query.ContainsKey("output") ? req.Query["output"].ToString().Replace(".", "") : url.ToSuffix();
-                var mode = req.Query.ContainsKey("mode") ? req.Query["mode"].ToString() : "";
-                var validOutputs = new List<string>() { "jpg", "gif", "png", "webp" };
+				// figure out the needed variables
+				// var url = req.Query["url"].ToString();
+				var size = req.Query.ContainsKey("size") ? req.Query["size"].ToString() : "";
+				var width = req.Query.ContainsKey("w") ? req.Query["w"].ToString().ToInt() : 0;
+				var height = req.Query.ContainsKey("h") ? req.Query["h"].ToString().ToInt() : 0;
+				var output = req.Query.ContainsKey("output") ? req.Query["output"].ToString().Replace(".", "") : url.ToSuffix();
+				var mode = req.Query.ContainsKey("mode") ? req.Query["mode"].ToString() : "";
+				var validOutputs = new List<string>() { "jpg", "gif", "png", "webp" };
 
-                // validate the output
-                if (!validOutputs.Contains(output))
-                    output = url.ToSuffix();
+				// validate the output
+				if (!validOutputs.Contains(output))
+					output = url.ToSuffix();
 
-                // figure out the actual size
-                if (string.IsNullOrEmpty(size))
-                    size = $"{width}x{height}";
+				// figure out the actual size
+				if (string.IsNullOrEmpty(size))
+					size = $"{width}x{height}";
 
-                // try to resize the image
-                var imageStream = await this.imageResizerService.ResizeAsync(url, size, output, mode);
+				// try to resize the image
+				var imageStream = await this.imageResizerService.ResizeAsync(url, size, output, mode, cache);
 
-                if (imageStream == null)
-                    return new NotFoundResult();
+				if (imageStream == null)
+					return new NotFoundResult();
 
-                // choose the correct mime type
-                var mimeType = output switch
-                {
-                    "jpg" => "image/jpeg",
-                    "gif" => "image/gif",
-                    "png" => "image/png",
-                    "webp" => "image/webp",
-                    _ => "image/jpeg"
-                };
+				// choose the correct mime type
+				var mimeType = output switch
+				{
+					"jpg" => "image/jpeg",
+					"gif" => "image/gif",
+					"png" => "image/png",
+					"webp" => "image/webp",
+					_ => "image/jpeg"
+				};
 
-                // set cache 
-                this.SetCacheHeaders(req.HttpContext.Response.GetTypedHeaders());
-                
-                // return the stream
-                return new FileStreamResult(imageStream, mimeType);
-            }
-            catch(Exception ex)
-            {
-                return new BadRequestResult();
-            }            
-        }
+				// set cache 
+				//this.SetCacheHeaders(req.HttpContext.Response.GetTypedHeaders());
 
-        private void SetCacheHeaders(ResponseHeaders responseHeaders)
+				// return the stream
+				return new FileStreamResult(imageStream, mimeType);
+			}
+			catch (Exception ex)
+			{
+				return new BadRequestResult();
+			}
+		}
+
+		private void SetCacheHeaders(ResponseHeaders responseHeaders)
         {
             responseHeaders.CacheControl = new CacheControlHeaderValue { Public = true };
             responseHeaders.LastModified = new DateTimeOffset(new DateTime(1900, 1, 1));
